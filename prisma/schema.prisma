@@ -72,9 +72,11 @@ model Act {
   status                Status           @default(ACTIVE)
   archivedAt            DateTime?
   voidedAt              DateTime?
+  deletedAt             DateTime?        // Soft delete marker
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 
   @@index([actType, year, sequentialNumber])
   @@index([status])
+  @@index([deletedAt])
 }
