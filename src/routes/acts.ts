@@ -4,6 +4,14 @@ import prisma from '../db';
 const router = Router();
 
 /**
+ * Helper: aplica filtro por soft delete (deletedAt IS NULL)
+ */
+function addNotDeleted(where: any) {
+  if (!where) return { deletedAt: null };
+  return { AND: [where, { deletedAt: null }] };
+}
+
+/**
  * Cria um novo ato.
  * Lógica:
  *  - Em transação: obter/atualizar sequence (FOR UPDATE) para actType+year
@@ -82,7 +90,7 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * Listar / Pesquisar
+ * Listar / Pesquisar (somente não deletados)
  * Query params:
  *  - q: texto livre (vai pesquisar em number, object, homologationNumber)
  *  - actType, status, requestingSector, year, dateFrom, dateTo
@@ -127,8 +135,11 @@ router.get('/', async (req, res) => {
       if (dateTo) filters.dateAct.lte = new Date(String(dateTo));
     }
 
-    const where: any = { ...filters };
+    let where: any = { ...filters };
     if (whereOr.length) where.OR = whereOr;
+
+    // garantir soft delete filter
+    where = addNotDeleted(where);
 
     const [total, data] = await Promise.all([
       prisma.act.count({ where }),
@@ -148,11 +159,11 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Obter ato
+ * Obter ato (somente não deletados)
  */
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
-  const act = await prisma.act.findUnique({ where: { id } });
+  const act = await prisma.act.findFirst({ where: { id, deletedAt: null } });
   if (!act) return res.status(404).json({ error: 'Ato não encontrado' });
   res.json(act);
 });
@@ -164,6 +175,9 @@ router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
   try {
+    const actExists = await prisma.act.findFirst({ where: { id, deletedAt: null } });
+    if (!actExists) return res.status(404).json({ error: 'Ato não encontrado' });
+
     const updated = await prisma.act.update({
       where: { id },
       data: updateData,
@@ -176,12 +190,18 @@ router.put('/:id', async (req, res) => {
 });
 
 /**
- * Excluir (hard delete)
+ * Soft Delete (marca deletedAt)
  */
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await prisma.act.delete({ where: { id } });
+    const act = await prisma.act.findFirst({ where: { id, deletedAt: null } });
+    if (!act) return res.status(404).json({ error: 'Ato não encontrado' });
+
+    await prisma.act.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -196,6 +216,9 @@ router.post('/:id/archive', async (req, res) => {
   const { id } = req.params;
   const { archive } = req.body; // true/false
   try {
+    const act = await prisma.act.findFirst({ where: { id, deletedAt: null } });
+    if (!act) return res.status(404).json({ error: 'Ato não encontrado' });
+
     const data: any = {};
     if (archive) {
       data.status = 'ARCHIVED';
@@ -219,6 +242,9 @@ router.post('/:id/void', async (req, res) => {
   const { id } = req.params;
   const { voided = true } = req.body;
   try {
+    const act = await prisma.act.findFirst({ where: { id, deletedAt: null } });
+    if (!act) return res.status(404).json({ error: 'Ato não encontrado' });
+
     const data: any = {};
     if (voided) {
       data.status = 'VOIDED';
