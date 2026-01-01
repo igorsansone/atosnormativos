@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ActType {
+  DECISAO
+  PORTARIA
+  RESOLUCAO
+}
+
+enum RequestingSector {
+  SECRETARIA
+  CADASTRO
+  TELEFONIA
+  COBRANCA
+  FINANCEIRO
+  PRESIDENCIA
+  PLENARIO
+  PROJUR
+  COMPRAS
+  RECURSOS_HUMANOS
+  CPD
+  FISCALIZACAO
+  DIRETORIA
+}
+
+enum Homologation {
+  DIRETORIA
+  PLENARIO
+  SECRETARIA
+  DESPACHO_PRESIDENTE
+  OUTROS
+  PENDENTE_DE_HOMOLOGACAO
+}
+
+enum Status {
+  ACTIVE
+  ARCHIVED
+  VOIDED
+}
+
+model Sequence {
+  id          Int     @id @default(autoincrement())
+  actType     ActType
+  year        Int
+  lastNumber  Int     @default(0)
+
+  @@unique([actType, year])
+  @@index([actType, year])
+}
+
+model Act {
+  id                    String           @id @default(uuid())
+  number                String           @db.VarChar(20) // ex: 001/2026
+  sequentialNumber      Int
+  year                  Int
+  actType               ActType
+  object                String?          @db.Text
+  requestingSector      RequestingSector?
+  dateAct               DateTime?        // data do requerimento/ato
+  homologation          Homologation?
+  homologationNumber    String?          // número da diretoria/plenária/despacho etc.
+  publishedSite         Boolean          @default(false)
+  publishedWord         Boolean          @default(false)
+  publishedPdf          Boolean          @default(false)
+  publishedPending      Boolean          @default(false)
+  status                Status           @default(ACTIVE)
+  archivedAt            DateTime?
+  voidedAt              DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([actType, year, sequentialNumber])
+  @@index([status])
+}
