@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: atos
+      POSTGRES_PASSWORD: atos_pass
+      POSTGRES_DB: atosdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://atos:atos_pass@db:5432/atosdb?schema=public
+      PORT: 3333
+    depends_on:
+      - db
+    ports:
+      - "3333:3333"
+
+volumes:
+  pgdata:
